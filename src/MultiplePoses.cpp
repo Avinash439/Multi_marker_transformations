@@ -1,5 +1,7 @@
 #include <iostream>
+#include <vector>
 #include <aruco/aruco.h>
+#include<algorithm>
 #include <aruco_msgs/MarkerArray.h>
 #include <geometry_msgs/Pose.h>
 #include <ros/ros.h>
@@ -27,10 +29,12 @@ ros::Publisher pub;
 ros::Publisher pub1;
 ros::Publisher pub2;
 ros::NodeHandle *nh;
-
+float minimum;
+int minimumid;
 
 std_msgs::Float64MultiArray transformation;
 double x,y,z,w,x_cor,y_cor,z_cor;
+
 MatrixXd T_kinect_arm;
 bool transformation_init = false;
 
@@ -53,11 +57,11 @@ MatrixXd T_marker_arm(4,4);
 Matrix3d R_marker_arm;
 Matrix3d R,R1,R2;
 
-
+/*
     R <<  0, 0, -1,
           0, -1, 0,
           -1, 0, 0;
-          
+  */        
 /*
           R << 0,-1,0,
           0,0,-1,
@@ -82,23 +86,58 @@ msg3.Multiplemarkers.resize(msg->markers.size());
 
 
 
-for(int i=0;i<msg->markers.size();++i)
+for(int i=0;i<msg->markers.size();i++)
 {
 msg2.header.stamp = ros::Time::now();
 msg2.header.frame_id = "kinect2_link";
 msg2.Multiplemarkers[i].id =msg->markers[i].id;// msg1.id;
 msg2.Multiplemarkers[i].pose = msg->markers[i].pose.pose;//msg1.pose;
 
+for(int j=0;j<msg->markers.size();j++)
+{
+	x_cor=msg2.Multiplemarkers[j].pose.position.x;
+	y_cor=msg2.Multiplemarkers[j].pose.position.y;
+	z_cor=msg2.Multiplemarkers[j].pose.position.z;
+
+float distance[5];
+int markerId[5];
+
+markerId[j]=msg->markers[j].id;
+
+int Id=msg->markers[j].id;
+ distance[j] = sqrt(x_cor*x_cor + y_cor*y_cor + z_cor*z_cor);
+ 
+cout<<"marker id"<<Id<<endl;
+cout<<"marker id"<<Id<<"distance"<<distance[0]<<endl;
+cout<<"marker id"<<Id<<"distance"<<distance[1]<<endl;
 
 
+ minimum = distance[0];
+ minimumid = msg->markers[0].id;
+  
+  
 
 
-
+     if (distance[j] < minimum || markerId[j] <minimumid)
+        {
+          minimum  = distance[j];
+         
+         minimumid = markerId[j];
+        }
+  }
+  
+  
 int Id=msg->markers[i].id;
+
+
+// from the array of detected markers calculates the distances and sort the smallest distance
+
+
+
 //cout <<"Enter  marker id: \n";
 //cin >>Id;
 
-switch (Id){
+switch ( Id){
 
 
 
@@ -119,7 +158,7 @@ Matrix3d R,R1,R2;
 
 T_marker_arm1.block(0,0,3,3) = R.inverse();
 Vector3d t_marker_arm;
-t_marker_arm << -0.075,-0.05,-1.075;
+t_marker_arm << -0.075,0.05,-1.075;
 T_marker_arm1.block(0,3,3,1) = t_marker_arm;
 T_marker_arm1.row(3) << 0,0,0,1;
 
@@ -159,7 +198,7 @@ T_marker_arm1.row(3) << 0,0,0,1;
 
 
 	T_kinect_arm = T_kinect_marker*T_marker_arm1;
-cout << T_kinect_arm << "\n\n";
+//cout << T_kinect_arm << "\n\n";
 	array.data.resize(16);
 	array.data[0]=T_kinect_arm(0,0);
 	array.data[1]=T_kinect_arm(0,1);
@@ -178,10 +217,15 @@ cout << T_kinect_arm << "\n\n";
 	array.data[14]=T_kinect_arm(3,2);
 	array.data[15]=T_kinect_arm(3,3);
 	
+	if(minimumid ==450)
+	{
 	pub1.publish(array);
-	
 	transformation_init = true;
+	
+	}
+	
 }
+
 break;
 	
 case 300:
@@ -191,16 +235,19 @@ MatrixXd T_marker_arm2(4,4);
 Matrix3d R_marker_arm;
 Matrix3d R,R1,R2;
 
-
-    R <<  0,  0,  1,
-          0, -1, 0,
-          1,  0,  0;
+/*
+    R <<   -1,  0, 0,
+           0,  0, 1,
+           0,  -1, 0 ;*/
           
-
+   R <<   -1,  0, 0,
+           0,  -1, 0,
+           0,  0, 1 ;
+ 
 
 T_marker_arm2.block(0,0,3,3) = R.inverse();
 Vector3d t_marker_arm;
-t_marker_arm << -0.075,-0.975,-0.05;
+t_marker_arm << -0.975,-0.05,-0.075;
 T_marker_arm2.block(0,3,3,1) = t_marker_arm;
 T_marker_arm2.row(3) << 0,0,0,1;
 
@@ -225,6 +272,7 @@ T_marker_arm2.row(3) << 0,0,0,1;
 	R_kinect_marker << R1(0),R1(1),R1(2),
 	      R1(3),R1(4),R1(5),
 	      R1(6),R1(7),R1(8);
+	  
 	     
 	T_kinect_marker.block(0,0,3,3) = R_kinect_marker;
 	Vector3d t_kinect_marker( x_cor,y_cor,z_cor);
@@ -233,7 +281,7 @@ T_marker_arm2.row(3) << 0,0,0,1;
 
 
 	MatrixXd T_kinect_arm =  T_kinect_marker*T_marker_arm2;
-	cout << T_kinect_arm << "\n\n";
+	//cout << T_kinect_arm << "\n\n";
 	array.data.resize(16);
 	array.data[0]=T_kinect_arm(0,0);
 	array.data[1]=T_kinect_arm(0,1);
@@ -251,9 +299,14 @@ T_marker_arm2.row(3) << 0,0,0,1;
 	array.data[13]=T_kinect_arm(3,1);
 	array.data[14]=T_kinect_arm(3,2);
 	array.data[15]=T_kinect_arm(3,3);
-	//pub1.publish(array);
-	
+	if(minimumid ==300)
+	{
+	pub1.publish(array);
 	transformation_init = true;
+	}
+	//pub1.publish(array);//side
+	
+	
 }
 break;
 
@@ -267,15 +320,15 @@ Matrix3d R_marker_arm;
 Matrix3d R,R1,R2;
 
 
-    R <<  0, 0, 1,
-          0, 1, 0,
-          -1, 0, 0;
+    R <<  0, 0, -1,
+           0, -1, 0,
+          1, 0, 0;
           
 
 
 T_marker_arm3.block(0,0,3,3) = R.inverse();
 Vector3d t_marker_arm;
-t_marker_arm << -1.075,0.05,-0.075;
+t_marker_arm << 0.05,-0.075,-1.075;
 T_marker_arm3.block(0,3,3,1) = t_marker_arm;
 T_marker_arm3.row(3) << 0,0,0,1;
 
@@ -308,7 +361,7 @@ T_marker_arm3.row(3) << 0,0,0,1;
 
 
 	MatrixXd T_kinect_arm =T_kinect_marker*T_marker_arm3;
-	cout << T_kinect_arm << "\n\n";
+	//cout << T_kinect_arm << "\n\n";
 	array.data.resize(16);
 	array.data[0]=T_kinect_arm(0,0);
 	array.data[1]=T_kinect_arm(0,1);
@@ -327,9 +380,15 @@ T_marker_arm3.row(3) << 0,0,0,1;
 	array.data[14]=T_kinect_arm(3,2);
 	array.data[15]=T_kinect_arm(3,3);
 	
-	//pub1.publish(array);
 	
+	if(minimumid ==350)
+	{
+	pub1.publish(array);
 	transformation_init = true;
+	}
+	//pub1.publish(array);//top marker
+	
+	
 	}
 break;
 case 400:
@@ -340,8 +399,8 @@ Matrix3d R_marker_arm;
 Matrix3d R,R1,R2;
 
 
-    R <<  1, 0, 0,
-          0, -1, 0,
+    R <<  -1, 0, 0,
+          0, 1, 0,
           0, 0, -1;
 
      
@@ -381,7 +440,7 @@ T_marker_arm4.row(3) << 0,0,0,1;
 
 
 	MatrixXd T_kinect_arm =T_kinect_marker*T_marker_arm4;
-	cout << T_kinect_arm << "\n\n";
+	//cout << T_kinect_arm << "\n\n";
 	array.data.resize(16);
 	array.data[0]=T_kinect_arm(0,0);
 	array.data[1]=T_kinect_arm(0,1);
@@ -399,11 +458,15 @@ T_marker_arm4.row(3) << 0,0,0,1;
 	array.data[13]=T_kinect_arm(3,1);
 	array.data[14]=T_kinect_arm(3,2);
 	array.data[15]=T_kinect_arm(3,3);
-	
+	if(minimumid ==400)
+	{
+	pub1.publish(array);
+	transformation_init = true;
+	}
 	//pub1.publish(array);
 	
 
-	transformation_init = true;
+	
 	}
 break;
 	
@@ -414,15 +477,25 @@ MatrixXd T_marker_arm5(4,4);
 Matrix3d R_marker_arm;
 Matrix3d R,R1,R2;
 
-
-    R <<  0, 0, 1,
-          0, -1, 0,
-          1, 0, 0;
+/*
+    R <<  0, -1, 0,
+          1, 0, 0,
+          0, 0, -1;
           
+  R <<    -1, 0, 0,
+          0, -1, 0,
+          0, 0, 1;*/
+          
+          
+   R <<    0, 1, 0,
+          -1, 0, 0,
+           0, 0, 1;
+
 
 T_marker_arm5.block(0,0,3,3) = R.inverse();
 Vector3d t_marker_arm;
-t_marker_arm << -0.075,-0.05,-1.075;
+//t_marker_arm << -1.075,-0.05,-0.075;
+t_marker_arm << 0.05,1.075,0.075;
 T_marker_arm5.block(0,3,3,1) = t_marker_arm;
 T_marker_arm5.row(3) << 0,0,0,1;
 
@@ -455,7 +528,7 @@ T_marker_arm5.row(3) << 0,0,0,1;
 
 
 	MatrixXd T_kinect_arm =  T_kinect_marker*T_marker_arm5;
-	cout << T_kinect_arm << "\n\n";
+	//cout << T_kinect_arm << "\n\n";
 	array.data.resize(16);
 	array.data[0]=T_kinect_arm(0,0);
 	array.data[1]=T_kinect_arm(0,1);
@@ -474,10 +547,14 @@ T_marker_arm5.row(3) << 0,0,0,1;
 	array.data[14]=T_kinect_arm(3,2);
 	array.data[15]=T_kinect_arm(3,3);
 	
-	
+	if(minimumid ==250)
+	{
+	pub1.publish(array);
+	transformation_init = true;
+	}
 	//pub1.publish(array);
 	
-	transformation_init = true;
+	
 	}
 break;
 	
@@ -545,102 +622,18 @@ break;
 
 }
 
-
+//cout<<"Minimum distance\n"<<minimum<<endl;
+//usleep(0.01*1000000);
 pub.publish(msg2);
 pub2.publish(msg3);
-
-
-}
-
-
-
-
-/*
-void randomcall_back2(std_msgs::Float64MultiArray array) 
-{
-
-
-for(int i=0;i<msg->markers.size();++i)
-{
-
-msg2.header.stamp = ros::Time::now();
-msg2.header.frame_id = "kinect2_link";
-msg2.Multiplemarkers[i].id =msg->markers[i].id;// msg1.id;
-msg2.Multiplemarkers[i].pose = msg->markers[i].pose.pose;//msg1.pose;
-
-x_cor=msg2.Multiplemarkers[i].pose.position.x;
-y_cor=msg2.Multiplemarkers[i].pose.position.y;
-z_cor=msg2.Multiplemarkers[i].pose.position.z;
-
-
-x=msg2.Multiplemarkers[i].pose.orientation.x;
-y=msg2.Multiplemarkers[i].pose.orientation.y;
-z=msg2.Multiplemarkers[i].pose.orientation.z;
-w=msg2.Multiplemarkers[i].pose.orientation.w;
-
-
-
-Quaterniond q(x, y, z, w);
-q.normalize();
-R1 = q.toRotationMatrix(); // convert a quaternion to a 3x3 rotation matrix 
-
-MatrixXd T_kinect_marker(4,4); 
-Matrix3d R_kinect_marker;
-
-R_kinect_marker << R1(1),R1(2),R1(3),
-      R1(4),R1(5),R1(6),
-      R1(7),R1(8),R1(9),
-     
-T_kinect_marker.block(0,0,3,3) = R_kinect_marker;
-Vector3d t_kinect_marker( x_cor,y_cor,z_cor);
-T_kinect_marker.block(0,3,3,1) = t_kinect_marker;
-T_kinect_marker.row(3) << 0,0,0,1;
-
-
-MatrixXd T_kinect_arm = T_marker_arm*T_kinect_marker;
-array.data.resize(16);
-array.data[0]=T_kinect_arm(1);
-array.data[1]=T_kinect_arm(2);
-array.data[2]=T_kinect_arm(3);
-array.data[3]=T_kinect_arm(4);
-array.data[4]=T_kinect_arm(5);
-array.data[5]=T_kinect_arm(6);
-array.data[6]=T_kinect_arm(7);
-array.data[7]=T_kinect_arm(8);
-array.data[8]=T_kinect_arm(9);
-array.data[9]=T_kinect_arm(10);
-array.data[10]=T_kinect_arm(11);
-array.data[11]=T_kinect_arm(12);
-array.data[12]=T_kinect_arm(13);
-array.data[13]=T_kinect_arm(14);
-array.data[14]=T_kinect_arm(15);
-array.data[15]=T_kinect_arm(16);
-
-
-MatrixXd marker_arm_transformation=T_kinect_arm*T_kinect_marker;
-transformation.data.resize(16);
-
-transformation.data[0]=marker_arm_transformation(1);
-transformation.data[1]=marker_arm_transformation(2);
-transformation.data[2]=marker_arm_transformation(3);
-transformation.data[3]=marker_arm_transformation(4);
-transformation.data[4]=marker_arm_transformation(5);
-transformation.data[5]=marker_arm_transformation(6);
-transformation.data[6]=marker_arm_transformation(7);
-transformation.data[7]=marker_arm_transformation(8);
-transformation.data[8]=marker_arm_transformation(9);
-transformation.data[9]=marker_arm_transformation(10);
-transformation.data[10]=marker_arm_transformation(11);
-transformation.data[11]=marker_arm_transformation(12);
-transformation.data[12]=marker_arm_transformation(13);
-transformation.data[13]=marker_arm_transformation(14);
-transformation.data[14]=marker_arm_transformation(15);
-transformation.data[15]=marker_arm_transformation(16);
-
+cout<<"Minimum distance id \n"<<minimumid<<endl;
 
 }
-}
-*/
+
+
+
+
+
 
 int main(int argc, char **argv) {
 
